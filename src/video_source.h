@@ -7,6 +7,6 @@ int VideoSourceUninit();
 
 int VideoSourcePush(int chn, unsigned char* pkt, unsigned int size);
 
-int VideoSourcePop(int chn, unsigned char** pkt, unsigned int* size);
+int VideoSourcePop(int chn, unsigned char* pkt, unsigned int size);
 
 #endif

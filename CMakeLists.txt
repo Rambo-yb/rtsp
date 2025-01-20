@@ -12,6 +12,9 @@ aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/general_src/list SRC)
 
 #aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/third_src/cjson SRC)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/third_src/easylogger SRC)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/third_src/rtsp_server/net SRC)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/third_src/rtsp_server/net/poller SRC)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/third_src/rtsp_server/base SRC)
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -22,13 +25,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/general_src/list)
 
 #include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_src/cjson)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_src/easylogger)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_src/rtsp_server)
 
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/liveMedia)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/groupsock)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/BasicUsageEnvironment)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/UsageEnvironment)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/lib)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/liveMedia)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/groupsock)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/BasicUsageEnvironment)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/include/UsageEnvironment)
+# link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/live/lib)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/openssl/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/openssl/lib)
@@ -43,8 +47,9 @@ endif()
 add_library(rtsp SHARED ${SRC})
 
 add_executable(rtsp_test ${MAIN_SRC})
-target_link_libraries(rtsp_test rtsp pthread m dl resolv)
-target_link_libraries(rtsp_test liveMedia groupsock BasicUsageEnvironment UsageEnvironment ssl crypto)
+target_link_libraries(rtsp_test rtsp pthread m dl resolv rt)
+target_link_libraries(rtsp_test ssl crypto)
+# target_link_libraries(rtsp_test liveMedia groupsock BasicUsageEnvironment UsageEnvironment ssl crypto)
 
 if (CHIP_TYPE STREQUAL "rv1126")
 target_link_libraries(rtsp_test easymedia RKAP_3A RKAP_ANR RKAP_Common rknn_runtime rknn_api md_share rkaiq VSC ArchModelSw NNArchPerf rockx rockface drm)

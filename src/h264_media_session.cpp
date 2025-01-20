@@ -1,6 +1,7 @@
+
 #include "h264_media_session.h"
 #include "check_common.h"
-
+/*
 #include "H264VideoStreamFramer.hh"
 #include "H264VideoRTPSink.hh"
 
@@ -79,3 +80,4 @@ FramedSource* H264MediaSession::createNewStreamSource(unsigned client_session_id
 RTPSink *H264MediaSession::createNewRTPSink(Groupsock* rtp_groupsock, unsigned char rtp_payload, FramedSource* input_source) {
 	return H264VideoRTPSink::createNew(envir(), rtp_groupsock, rtp_payload);
 }
+*/

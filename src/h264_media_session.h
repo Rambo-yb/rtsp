@@ -1,6 +1,6 @@
 #ifndef __H264_MEDIA_SESSION_H__
 #define __H264_MEDIA_SESSION_H__
-
+/*
 #include "h264_video_source.h"
 #include "OnDemandServerMediaSubsession.hh"
 
@@ -28,5 +28,5 @@ private:
 	char done_flag;
 	RTPSink* dummy_rtp_sink;
 };
-
+*/
 #endif

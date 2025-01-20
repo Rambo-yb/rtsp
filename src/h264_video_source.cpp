@@ -1,56 +1,51 @@
-#include "h264_video_source.h"
-#include "check_common.h"
-#include "video_source.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
 
-H264VideoSource* H264VideoSource::CreateNew(UsageEnvironment& env) {
-  return new H264VideoSource(env);
+#include "h264_video_source.h"
+#include "video_source.h"
+#include "log.h"
+
+#include "base/Logging.h"
+#include "base/New.h"
+
+H264VideoSource* H264VideoSource::createNew(UsageEnvironment* env) {
+	return New<H264VideoSource>::allocate(env);
 }
 
-H264VideoSource::H264VideoSource(UsageEnvironment& env) : FramedSource(env) {
+H264VideoSource::H264VideoSource(UsageEnvironment* env) : MediaSource(env) {
+	setFps(25);
+
+	for(int i = 0; i < DEFAULT_FRAME_NUM; ++i)
+		mEnv->threadPool()->addTask(mTask);
 }
 
 H264VideoSource::~H264VideoSource() {
 
 }
 
-unsigned int H264VideoSource::maxFrameSize() const {
-	return 100000;
-}
+void H264VideoSource::readFrame() {
+	MutexLockGuard mutexLockGuard(mMutex);
 
-static long GetTime() {
-    struct timeval time_;
-    memset(&time_, 0, sizeof(struct timeval));
+	if(mAVFrameInputQueue.empty())
+		return;
 
-    gettimeofday(&time_, NULL);
-    return time_.tv_sec*1000 + time_.tv_usec/1000;
-}
+	AVFrame* frame = mAVFrameInputQueue.front();
 
-void H264VideoSource::doGetNextFrame() {
-	static long curtime = GetTime();
-	LOG_INFO("send stream time:%ld", GetTime() - curtime);
-	curtime = GetTime();
+	frame->mFrameSize = VideoSourcePop(0, frame->mBuffer, FRAME_MAX_SIZE);
+	if(frame->mFrameSize < 0)
+		return;
 
-	unsigned char* buff = NULL;
-	unsigned int size = 0;
-	if (VideoSourcePop(0, &buff, &size) < 0) {
-		return ;
-	}
-	LOG_INFO("size:%d max:%d", size, fMaxSize);
-
-	if (size > fMaxSize) {
-		fFrameSize = fMaxSize;
-		fNumTruncatedBytes = size - fMaxSize;
+	if(frame->mBuffer[0] == 0 && frame->mBuffer[1] == 0 && frame->mBuffer[2] == 1) {
+		frame->mFrame = frame->mBuffer+3;
+		frame->mFrameSize -= 3;
 	} else {
-		fFrameSize = size;
+		frame->mFrame = frame->mBuffer+4;
+		frame->mFrameSize -= 4;
 	}
 
-	gettimeofday(&fPresentationTime, NULL);
-	memcpy(fTo, buff, fFrameSize);
-	delete[] buff;
-
-	FramedSource::afterGetting(this);
-}
-
-void H264VideoSource::doStopGettingFrames() {
-	
+	mAVFrameInputQueue.pop();
+	mAVFrameOutputQueue.push(frame);
 }

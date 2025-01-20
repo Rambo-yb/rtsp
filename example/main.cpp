@@ -70,7 +70,9 @@ static void* RecordPush(void* arg) {
         for(__Frame frame : kMng.media_list) {
 			long cur_time = GetTime();
             RtspServerPushStream(frame.data, frame.size);
-            usleep(10*1000);
+			while(cur_time + 40 > GetTime()) {
+            	usleep(1*1000);
+			}
         }
     }
 }

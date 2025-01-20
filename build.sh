@@ -77,13 +77,17 @@ build_main()
 	cp rtsp_test /home/smb/work/ -raf
 }
 
+[ "$2" == "jthread" ] && build_jthread rebuild && exit
+[ "$2" == "jrtplib" ] && build_jrtplib rebuild && exit
 [ "$2" == "openssl" ] && build_openssl rebuild && exit
 [ "$2" == "live555" ] && build_live555 rebuild && exit
 [ "$2" == "main" ] && build_main && exit
 
 if [ "$2" == "all" ]; then
-	build_openssl
-	build_live555
+	# build_openssl
+	# build_live555
+	# build_jthread
+    # build_jrtplib
 	
 	# build_main
 fi
