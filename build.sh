@@ -70,7 +70,7 @@ build_main()
 
 	mkdir build
 	cd $CUR_DIR/build
-	cmake .. -DCMAKE_C_COMPILER=${HOST}-gcc -DCMAKE_CXX_COMPILER=${HOST}-g++ -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/rtsp
+	cmake .. -DCMAKE_C_COMPILER=${HOST}-gcc -DCMAKE_CXX_COMPILER=${HOST}-g++ -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/rtsp -DCHIP_TYPE=$CHIP_TYPE
 	make && make install
 
 	cp librtsp.so /home/smb/work/ -raf

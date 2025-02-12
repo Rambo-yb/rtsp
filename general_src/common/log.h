@@ -51,7 +51,7 @@
 extern "C" {
 #endif
 
-int log_init(char* file, int size, int cnt, int lvl);
+int LogInit(char* file, int size, int cnt, int lvl);
 
 #ifdef __cplusplus
 }

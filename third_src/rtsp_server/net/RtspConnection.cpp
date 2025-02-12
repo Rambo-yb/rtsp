@@ -370,7 +370,13 @@ bool RtspConnection::handleCmdOption()
 
 bool RtspConnection::handleCmdDescribe()
 {
-    MediaSession* session = mRtspServer->loopupMediaSession(mSuffix);
+	char sessionName[100];
+	if(sscanf(mSuffix.c_str(), "%[^?]?", sessionName) != 1)
+	{
+		return false;
+	}
+
+    MediaSession* session = mRtspServer->loopupMediaSession(sessionName);
     if(!session)
     {
         LOG_DEBUG("can't loop up %s session\n", mSuffix.c_str());
@@ -401,7 +407,7 @@ bool RtspConnection::handleCmdDescribe()
 bool RtspConnection::handleCmdSetup()
 {
     char sessionName[100];
-    if(sscanf(mSuffix.c_str(), "%[^/]/", sessionName) != 1)
+    if(sscanf(mSuffix.c_str(), "%[^?]?", sessionName) != 1)
     {
         return false;
     }

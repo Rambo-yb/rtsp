@@ -5,8 +5,29 @@ int VideoSourceInit();
 
 int VideoSourceUninit();
 
-int VideoSourcePush(int chn, unsigned char* pkt, unsigned int size);
+int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size);
 
-int VideoSourcePop(int chn, unsigned char* pkt, unsigned int size);
+int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size);
+
+
+#include "net/UsageEnvironment.h"
+#include "net/MediaSource.h"
+#include "base/ThreadPool.h"
+
+class VideoSource : public MediaSource
+{
+public:
+    static VideoSource* createNew(UsageEnvironment* env, int chn, int type);
+    
+    VideoSource(UsageEnvironment* env, int chn, int type);
+    ~VideoSource();
+
+protected:
+    virtual void readFrame();
+	
+private:
+	int channel;
+	int stream_type;
+};
 
 #endif
