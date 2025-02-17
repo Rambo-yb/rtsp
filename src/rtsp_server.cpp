@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <list>
+
 #include "log.h"
 #include "check_common.h"
 #include "rtsp_server.h"
@@ -15,9 +17,10 @@
 #include "net/RtspServer.h"
 #include "net/MediaSession.h"
 #include "net/InetAddress.h"
-#include "net/H264FileMediaSource.h"
 #include "net/H264RtpSink.h"
+#include "net/AACRtpSink.h"
 
+#define RTSP_LIB_VERSION ("V1.0.0")
 #define RTSP_DEFAULT_LOGS_PATH "/data/logs"
 
 typedef struct {
@@ -25,6 +28,7 @@ typedef struct {
 	ThreadPool* thread_pool;
 	UsageEnvironment* env;
 	RtspServer* server;
+	std::list<RtspServerStreamingRegisterInfo> reg_list;
 }RtspServerMsg;
 static RtspServerMsg kRtspServerMsg;
 
@@ -89,24 +93,49 @@ int RtspServerInit(const char* log_path) {
 	pthread_t pthread_id;
 	pthread_create(&pthread_id, NULL, RtspServerProc, NULL);
 
+    LOG_INFO("rtsp server init success! compile time:%s %s, ver:%s", __DATE__, __TIME__, RTSP_LIB_VERSION);
 	return 0;
 }
 
 int RtspServerUnInit() {
+
 	return 0;
 }
 
-void RtspServerStreamingRegister(int chn, int type) {
-	char sess_name[16] = {0};
-	snprintf(sess_name, sizeof(sess_name), "streaming/%03d", chn*100+type+1);
+void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, int size) {
+	for (int i = 0; i < size; i++) {
+		RtspServerStreamingRegisterInfo _info;
+		memcpy(&_info, &info[i], sizeof(RtspServerStreamingRegisterInfo));
 
-    MediaSession* session = MediaSession::createNew(sess_name);
-    MediaSource* mediaSource = VideoSource::createNew(kRtspServerMsg.env, chn, type);
-    RtpSink* rtpSink = H264RtpSink::createNew(kRtspServerMsg.env, mediaSource);
-
-	session->addRtpSink(MediaSession::TrackId0, rtpSink);
-	kRtspServerMsg.server->addMeidaSession(session);
-	LOG_INFO("%s", kRtspServerMsg.server->getUrl(session).c_str());
+		char sess_name[16] = {0};
+		snprintf(sess_name, sizeof(sess_name), "streaming/%03d", _info.chn*100+_info.stream_type+1);
+	
+		MediaSession* session = MediaSession::createNew(sess_name);
+		if (_info.video_info.use) {
+			MediaSource* source = VideoSource::createNew(kRtspServerMsg.env, _info.chn, _info.stream_type, _info.video_info.fps);
+			RtpSink* sink = NULL;
+			if (_info.video_info.video_type == RTSP_SERVER_VIDEO_H264) {
+				sink = H264RtpSink::createNew(kRtspServerMsg.env, source);
+			}
+	
+			session->addRtpSink(MediaSession::TrackId0, sink);
+		}
+	
+		if (_info.audio_info.use) {
+			// MediaSource* source = VideoSource::createNew(kRtspServerMsg.env, _info.chn, _info.stream_type, _info.video_info.fps);
+			MediaSource* source = NULL;
+			RtpSink* sink = NULL;
+			if (_info.video_info.video_type == RTSP_SERVER_VIDEO_H264) {
+				sink = AACRtpSink::createNew(kRtspServerMsg.env, source);
+			}
+	
+			session->addRtpSink(MediaSession::TrackId1, sink);
+		}
+	
+		kRtspServerMsg.server->addMeidaSession(session);
+		LOG_INFO("%s", kRtspServerMsg.server->getUrl(session).c_str());
+		kRtspServerMsg.reg_list.push_back(_info);
+	}
 }
 
 void RtspServerRecordingRegister(int chn) {
@@ -114,14 +143,26 @@ void RtspServerRecordingRegister(int chn) {
 	snprintf(sess_name, sizeof(sess_name), "recording/%03d", chn*100+1);
 
     MediaSession* session = MediaSession::createNew(sess_name);
-    MediaSource* mediaSource = VideoSource::createNew(kRtspServerMsg.env, chn, 1);
+    MediaSource* mediaSource = VideoSource::createNew(kRtspServerMsg.env, chn, 1, 30);
     RtpSink* rtpSink = H264RtpSink::createNew(kRtspServerMsg.env, mediaSource);
 
 	session->addRtpSink(MediaSession::TrackId0, rtpSink);
 	kRtspServerMsg.server->addMeidaSession(session);
 }
 
-int RtspServerPushStream(int chn, int type, unsigned char* buff, unsigned int size) {
-	
-	return VideoSourcePush(chn, type, buff, size);
+int RtspServerPushStream(RtspServerPushStreamInfo* info) {
+	int flag = false;
+	for(RtspServerStreamingRegisterInfo reg_item : kRtspServerMsg.reg_list) {
+		if (reg_item.chn == info->chn && reg_item.stream_type == info->stream_type) {
+			flag = true;
+			break;
+		}
+	}
+
+	if (flag) {
+		return VideoSourcePush(info->chn, info->stream_type, info->buff, info->size);
+	} else {
+		LOG_ERR("unknown chn:%d, type:%d", info->chn, info->stream_type);
+		return -1;
+	}
 }

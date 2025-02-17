@@ -17,9 +17,9 @@ int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size);
 class VideoSource : public MediaSource
 {
 public:
-    static VideoSource* createNew(UsageEnvironment* env, int chn, int type);
+    static VideoSource* createNew(UsageEnvironment* env, int chn, int type, int fps);
     
-    VideoSource(UsageEnvironment* env, int chn, int type);
+    VideoSource(UsageEnvironment* env, int chn, int type, int fps);
     ~VideoSource();
 
 protected:

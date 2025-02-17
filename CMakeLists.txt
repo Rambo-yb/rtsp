@@ -60,4 +60,4 @@ target_link_libraries(rtsp_test ssl crypto)
 
 install(TARGETS rtsp_test DESTINATION bin)
 install(TARGETS rtsp DESTINATION lib)
-#install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY include/ DESTINATION include)

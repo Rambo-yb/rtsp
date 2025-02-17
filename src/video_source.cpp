@@ -67,12 +67,12 @@ int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size) {
 }
 
 
-VideoSource* VideoSource::createNew(UsageEnvironment* env, int chn, int type) {
-	return New<VideoSource>::allocate(env, chn, type);
+VideoSource* VideoSource::createNew(UsageEnvironment* env, int chn, int type, int fps) {
+	return New<VideoSource>::allocate(env, chn, type, fps);
 }
 
-VideoSource::VideoSource(UsageEnvironment* env, int chn, int type) : MediaSource(env) {
-	setFps(25);
+VideoSource::VideoSource(UsageEnvironment* env, int chn, int type, int fps) : MediaSource(env) {
+	setFps(fps);
 
 	channel = chn;
 	stream_type = type; 

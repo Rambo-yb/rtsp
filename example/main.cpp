@@ -19,23 +19,37 @@ typedef struct {
 }Mng;
 static Mng kMng;
 
+
+static long GetTime() {
+    struct timeval time_;
+    memset(&time_, 0, sizeof(struct timeval));
+
+    gettimeofday(&time_, NULL);
+    return time_.tv_sec*1000 + time_.tv_usec/1000;
+}
+
 #ifdef CHIP_TYPE_RV1126
 
 #include "rkmedia_api.h"
 #include "rkmedia_venc.h"
 
 void StreamPush(MEDIA_BUFFER mb) {
-    RtspServerPushStream(0, RTSP_SERVER_STREAMING_MAIN, (unsigned char*)RK_MPI_MB_GetPtr(mb), RK_MPI_MB_GetSize(mb));
+	RtspServerPushStreamInfo info = {0};
+	info.chn = 0;
+	info.stream_type = RTSP_SERVER_STREAMING_MAIN;
+	info.buff = (unsigned char*)RK_MPI_MB_GetPtr(mb);
+	info.size = RK_MPI_MB_GetSize(mb);
+    RtspServerPushStream(&info);
 
 	RK_MPI_MB_ReleaseBuffer(mb);
 }
 
 int StreamInit() {
     int ret = 0;
-    const char* device_name = "/dev/video0";
+    const char* device_name = "/dev/video45";
     int cam_id = 0;
     int width = 640;
-    int height = 512;
+    int height = 480;
     CODEC_TYPE_E codec_type = RK_CODEC_TYPE_H264;
 
     RK_MPI_SYS_Init();
@@ -44,7 +58,7 @@ int StreamInit() {
     vi_chn_attr.u32BufCnt = 3;
     vi_chn_attr.u32Width = width;
     vi_chn_attr.u32Height = height;
-    vi_chn_attr.enPixFmt = IMAGE_TYPE_NV16;
+    vi_chn_attr.enPixFmt = IMAGE_TYPE_YUYV422;
     vi_chn_attr.enBufType = VI_CHN_BUF_TYPE_MMAP;
     vi_chn_attr.enWorkMode = VI_WORK_MODE_NORMAL;
     ret = RK_MPI_VI_SetChnAttr(cam_id, 0, &vi_chn_attr);
@@ -73,7 +87,7 @@ int StreamInit() {
         venc_chn_attr.stVencAttr.enType = RK_CODEC_TYPE_H264;
         venc_chn_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
         venc_chn_attr.stRcAttr.stH264Cbr.u32Gop = 30;
-        venc_chn_attr.stRcAttr.stH264Cbr.u32BitRate = width * height;
+        venc_chn_attr.stRcAttr.stH264Cbr.u32BitRate = width * height * 10;
         // frame rate: in 30/1, out 30/1.
         venc_chn_attr.stRcAttr.stH264Cbr.fr32DstFrameRateDen = 1;
         venc_chn_attr.stRcAttr.stH264Cbr.fr32DstFrameRateNum = 30;
@@ -81,7 +95,7 @@ int StreamInit() {
         venc_chn_attr.stRcAttr.stH264Cbr.u32SrcFrameRateNum = 30;
         break;
     }
-    venc_chn_attr.stVencAttr.imageType = IMAGE_TYPE_NV16;
+    venc_chn_attr.stVencAttr.imageType = IMAGE_TYPE_YUYV422;
     venc_chn_attr.stVencAttr.u32PicWidth = width;
     venc_chn_attr.stVencAttr.u32PicHeight = height;
     venc_chn_attr.stVencAttr.u32VirWidth = width;
@@ -165,19 +179,16 @@ static unsigned char* FindFrame(const unsigned char* buff, int len, int* size) {
 	return s;
 }
 
-static long GetTime() {
-    struct timeval time_;
-    memset(&time_, 0, sizeof(struct timeval));
-
-    gettimeofday(&time_, NULL);
-    return time_.tv_sec*1000 + time_.tv_usec/1000;
-}
-
 static void* RecordPush(void* arg) {
     while(1) {
         for(__Frame frame : kMng.media_list) {
 			long cur_time = GetTime();
-            RtspServerPushStream(0, RTSP_SERVER_STREAMING_SUB, frame.data, frame.size);
+			RtspServerPushStreamInfo info = {0};
+			info.chn = 0;
+			info.stream_type = RTSP_SERVER_STREAMING_SUB;
+			info.buff = frame.data;
+			info.size = frame.size;
+            RtspServerPushStream(&info);
 			while(cur_time + 40 > GetTime()) {
             	usleep(1*1000);
 			}
@@ -232,8 +243,12 @@ static int RecordInit() {
 
 int main(int argv, char** argc) {
 	RtspServerInit("./");
-	RtspServerStreamingRegister(0, RTSP_SERVER_STREAMING_MAIN);
-	RtspServerStreamingRegister(0, RTSP_SERVER_STREAMING_SUB);
+
+	RtspServerStreamingRegisterInfo info[2] = {
+		{.chn = 0, .stream_type = RTSP_SERVER_STREAMING_MAIN, .video_info = {.use = 1, .video_type = RTSP_SERVER_VIDEO_H264, .fps = 30}},
+		{.chn = 0, .stream_type = RTSP_SERVER_STREAMING_SUB, .video_info = {.use = 1, .video_type = RTSP_SERVER_VIDEO_H264, .fps = 30}},
+	};
+	RtspServerStreamingRegister(info, 2);
 
 	StreamInit();
 	RecordInit();
