@@ -12,7 +12,7 @@ class Logger;
     if(Logger::LogWarning <= Logger::getLogLevel()) \
         Logger().write(Logger::LogWarning, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 
-#define LOG_DEBUG(format, ...) \
+#define LOG_DEBUGGING(format, ...) \
     if(Logger::LogDebug <= Logger::getLogLevel()) \
         Logger().write(Logger::LogDebug, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 

@@ -8,10 +8,11 @@ extern "C" {
 /**
  * @brief RTSP服务器初始化
  * @param [in] log_path 日志路径，为NULL时默认存储/data/logs
+ * @param [in] config_path 配置路径，为NULL时默认存储/data/configs
  * @return 成功返回 0
  *         失败返回 其他值
 */
-int RtspServerInit(const char* log_path);
+int RtspServerInit(const char* log_path, const char* config_path);
 
 /**
  * @brief RTSP服务器反初始化
@@ -46,21 +47,21 @@ typedef struct {
 }RtspServerAudioInfo;
 
 typedef struct {
-	unsigned int chn;					// 音视频通道
+	int chn;							// 音视频通道，【-1：录像回放通道】
 	unsigned int stream_type;			// 码流类型，RtspServerStreamingType
 	RtspServerVideoInfo video_info;		// 视频信息
 	RtspServerAudioInfo audio_info;		// 音频信息，暂不支持
 }RtspServerStreamingRegisterInfo;
 
 /**
- * @brief RTSP服务器码流注册函数
- * @param [in] info 码流注册信息
+ * @brief RTSP服务器码流注册函数，录像回放通道只需注册一次
+ * @param [in] info 码流注册信息数组
  * @param [in] size 码流注册信息个数
  */
-void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, int size);
+void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, unsigned int size);
 
 typedef struct {
-	unsigned int chn;			// 音视频通道
+	int chn;					// 音视频通道，【-1：录像回放通道】
 	unsigned int stream_type;	// 码流类型，RtspServerStreamingType
 	unsigned int pts;
 	unsigned int size;
@@ -74,6 +75,40 @@ typedef struct {
  *         失败返回 其他值
  */
 int RtspServerPushStream(RtspServerPushStreamInfo* info);
+
+typedef enum {
+	RTSP_SERVER_GET_RECORD_STOP,	// 结束预览录像
+	RTSP_SERVER_GET_RECORD_BY_FILE,	// 通过文件预览录像
+	RTSP_SERVER_GET_RECORD_BY_TIME,	// 通过时间预览录像
+}RtspServerGetRecordMode;
+
+typedef struct {
+	unsigned int year;	// 年
+	unsigned int month;	// 月
+	unsigned int day;	// 日
+	unsigned int hour;	// 时
+	unsigned int min;	// 分
+	unsigned int sec;	// 秒
+}RtspServerTime;
+
+typedef struct {
+	int mode;					// RtspServerGetRecordMode
+
+	// RTSP_SERVER_GET_RECORD_BY_FILE
+	char filename[128];				// 文件名
+
+	// RTSP_SERVER_GET_RECORD_BY_TIME
+	int chn;					// 通道
+	RtspServerTime start_time;	// 开始时间
+	RtspServerTime end_time;	// 结束时间
+}RtspServerRecordInfo;
+typedef int (*RtspServerOperationRecording)(RtspServerRecordInfo* );
+
+/**
+ * @brief RTSP服务器回调注册函数
+ * @param [in] cb 回调函数
+ */
+void RtspServerOperationRegister(void* cb);
 
 #ifdef __cplusplus
 }

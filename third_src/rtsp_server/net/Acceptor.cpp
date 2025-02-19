@@ -53,7 +53,7 @@ void Acceptor::readCallback(void* arg)
 void Acceptor::handleRead()
 {
     int connfd = mSocket.accept();
-    LOG_DEBUG("client connect: %d\n", connfd);
+    LOG_DEBUGGING("client connect: %d\n", connfd);
     if(mNewConnectionCallback)
         mNewConnectionCallback(mArg, connfd);
 }

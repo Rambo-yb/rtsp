@@ -9,6 +9,9 @@
 #include "base/Logging.h"
 #include "base/New.h"
 
+// 源码修改：外部url函数定义
+extern int RtspServerUrlParse(const char* cmd, const char* uri, char* sess_name, int size);
+
 static void getPeerIp(int sockfd, std::string& ip)
 {
     struct sockaddr_in addr;
@@ -370,8 +373,9 @@ bool RtspConnection::handleCmdOption()
 
 bool RtspConnection::handleCmdDescribe()
 {
+	// 源码修改：自定义url解析
 	char sessionName[100];
-	if(sscanf(mSuffix.c_str(), "%[^?]?", sessionName) != 1)
+	if(RtspServerUrlParse("describe", mSuffix.c_str(), sessionName, sizeof(sessionName)) < 0)
 	{
 		return false;
 	}
@@ -379,7 +383,7 @@ bool RtspConnection::handleCmdDescribe()
     MediaSession* session = mRtspServer->loopupMediaSession(sessionName);
     if(!session)
     {
-        LOG_DEBUG("can't loop up %s session\n", mSuffix.c_str());
+        LOG_DEBUGGING("can't loop up %s session\n", mSuffix.c_str());
         return false;
     }
 
@@ -406,16 +410,17 @@ bool RtspConnection::handleCmdDescribe()
 
 bool RtspConnection::handleCmdSetup()
 {
-    char sessionName[100];
-    if(sscanf(mSuffix.c_str(), "%[^?]?", sessionName) != 1)
-    {
-        return false;
-    }
+	// 源码修改：自定义url解析
+	char sessionName[100];
+	if(RtspServerUrlParse("setup", mSuffix.c_str(), sessionName, sizeof(sessionName)) < 0)
+	{
+		return false;
+	}
 
     MediaSession* session = mRtspServer->loopupMediaSession(sessionName);
     if(!session)
     {
-        LOG_DEBUG("can't loop up %s session\n", sessionName);
+        LOG_DEBUGGING("can't loop up %s session\n", sessionName);
         return false;
     }
 
@@ -517,11 +522,17 @@ bool RtspConnection::handleCmdPlay()
             mRtcpInstances[i]->setAlive(true);
     }
 
+	char sessionName[100];
+	RtspServerUrlParse("play", mSuffix.c_str(), sessionName, sizeof(sessionName));
+
     return true;
 }
 
 bool RtspConnection::handleCmdTeardown()
 {
+	char sessionName[100];
+	RtspServerUrlParse("teardown", mSuffix.c_str(), sessionName, sizeof(sessionName));
+
     snprintf((char*)mBuffer, sizeof(mBuffer),
             "RTSP/1.0 200 OK\r\n"
             "CSeq: %d\r\n"
@@ -538,7 +549,7 @@ bool RtspConnection::handleCmdTeardown()
 
 bool RtspConnection::handleCmdGetParamter()
 {
-    
+    return true;
 }
 
 int RtspConnection::sendMessage(void* buf, int size)

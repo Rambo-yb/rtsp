@@ -93,7 +93,7 @@ void TcpConnection::handleRead()
 
     if(ret == 0)
     {
-        LOG_DEBUG("client disconnect\n");
+        LOG_DEBUGGING("client disconnect\n");
         handleDisconnection();
         return;
     }
@@ -112,19 +112,19 @@ void TcpConnection::handleRead()
 
 void TcpConnection::handleReadBytes()
 {
-    LOG_DEBUG("default read handle\n");
+    LOG_DEBUGGING("default read handle\n");
     mInputBuffer.retrieveAll();
 }
 
 void TcpConnection::handleWrite()
 {
-    LOG_DEBUG("default wirte handle\n");
+    LOG_DEBUGGING("default wirte handle\n");
     mOutBuffer.retrieveAll();
 }
 
 void TcpConnection::handleError()
 {
-    LOG_DEBUG("default error handle\n");
+    LOG_DEBUGGING("default error handle\n");
 }
 
 void TcpConnection::readCallback(void* arg)

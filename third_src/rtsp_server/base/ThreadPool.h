@@ -28,6 +28,7 @@ public:
         bool operator=(const Task& task) {
             this->mTaskCallback = task.mTaskCallback;
             this->mArg = task.mArg;
+			return true;
         }
     private:
         void (*mTaskCallback)(void*);

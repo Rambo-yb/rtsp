@@ -49,7 +49,7 @@ void TcpServer::handleDisconnection(int sockfd)
     std::map<int, TcpConnection*>::iterator it = mTcpConnections.find(sockfd);
     if(it == mTcpConnections.end())
     {
-        LOG_DEBUG("can't find\n");
+        LOG_DEBUGGING("can't find\n");
         return;
     }
     

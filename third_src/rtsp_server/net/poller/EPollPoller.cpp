@@ -82,7 +82,7 @@ void EPollPoller::handleEvent()
     nums = epoll_wait(mEPollFd, &*mEPollEventList.begin(), mEPollEventList.size(), epollTimeout);
     if(nums < 0)
     {
-        LOG_DEBUG("epoll wait err\n");
+        LOG_DEBUGGING("epoll wait err\n");
         return;
     }
 

@@ -18,6 +18,7 @@ AsyncLogging::AsyncLogging(std::string file) :
     assert(mCond);
 
     mFp = fopen(mFile.c_str(), "w");
+	// 源码修改：rk3588编译，比较类型不匹配报错
     assert(mFp >= (void*)0);
 
     for(int i = 0; i < BUFFER_NUM; ++i)

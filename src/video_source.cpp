@@ -26,22 +26,30 @@ typedef struct {
 
 typedef struct {
 	pthread_mutex_t mutex;
-	std::queue<VideoSourceInfo> src_info[VIDEO_SOURCE_CHN_MAX][VIDEO_SOURCE_STREAM_TYPE_MAX];
+	std::queue<VideoSourceInfo> record_video_src;
+	std::queue<VideoSourceInfo> real_video_src[VIDEO_SOURCE_CHN_MAX][VIDEO_SOURCE_STREAM_TYPE_MAX];
 }VideoSourceMng;
 static VideoSourceMng kVideoSourceMng = {.mutex = PTHREAD_MUTEX_INITIALIZER};
 
 int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size) {
 	pthread_mutex_lock(&kVideoSourceMng.mutex);
-	if (kVideoSourceMng.src_info[chn][type].size() >= VIDEO_SOURCE_QUEUE_MAX) {
-		VideoSourceInfo info = kVideoSourceMng.src_info[chn][type].front();
-		kVideoSourceMng.src_info[chn][type].pop();
+	std::queue<VideoSourceInfo>* src_info_queue = nullptr;
+	if(chn == -1) {
+		src_info_queue = &kVideoSourceMng.record_video_src;
+	} else {
+		src_info_queue = &kVideoSourceMng.real_video_src[chn][type];
+	}
+
+	if(src_info_queue->size() >= VIDEO_SOURCE_QUEUE_MAX) {
+		VideoSourceInfo info = src_info_queue->front();
+		src_info_queue->pop();
 		LOG_WRN("chn[%d] type[%d] video queue greater than queue max [%d], remove old video src !!!", chn, type, VIDEO_SOURCE_QUEUE_MAX);
 	}
 
 	VideoSourceInfo new_src;
 	memcpy(new_src.video_src, pkt, size);
 	new_src.size = size;
-	kVideoSourceMng.src_info[chn][type].push(new_src);
+	src_info_queue->push(new_src);
 
 	pthread_mutex_unlock(&kVideoSourceMng.mutex);
 	return 0;
@@ -49,18 +57,25 @@ int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size) {
 
 int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size) {
 	pthread_mutex_lock(&kVideoSourceMng.mutex);
-	if (kVideoSourceMng.src_info[chn][type].empty()) {
+	std::queue<VideoSourceInfo>* src_info_queue = nullptr;
+	if(chn == -1) {
+		src_info_queue = &kVideoSourceMng.record_video_src;
+	} else {
+		src_info_queue = &kVideoSourceMng.real_video_src[chn][type];
+	}
+
+	if (src_info_queue->empty()) {
 		pthread_mutex_unlock(&kVideoSourceMng.mutex);
 		return -1;
 	}
 
-	VideoSourceInfo info = kVideoSourceMng.src_info[chn][type].front();
+	VideoSourceInfo info = src_info_queue->front();
 	if (size < info.size) {
 		pthread_mutex_unlock(&kVideoSourceMng.mutex);
 		return -1;
 	}
 	memcpy(pkt, info.video_src, info.size);
-	kVideoSourceMng.src_info[chn][type].pop();
+	src_info_queue->pop();
 
 	pthread_mutex_unlock(&kVideoSourceMng.mutex);
 	return info.size;

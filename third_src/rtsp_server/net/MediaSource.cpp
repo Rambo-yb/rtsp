@@ -24,6 +24,7 @@ AVFrame* MediaSource::getFrame()
 
     if(mAVFrameOutputQueue.empty())
     {
+		// 源码修改：队列为空重新加入线程池，否则无法取数据
     	mEnv->threadPool()->addTask(mTask);
         return NULL;
     }

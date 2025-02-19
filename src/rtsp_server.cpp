@@ -29,8 +29,82 @@ typedef struct {
 	UsageEnvironment* env;
 	RtspServer* server;
 	std::list<RtspServerStreamingRegisterInfo> reg_list;
+	void* record_oper_cb;
 }RtspServerMsg;
 static RtspServerMsg kRtspServerMsg;
+
+extern int RtspServerUrlParse(const char* cmd, const char* uri, char* sess_name, int size) {
+	CHECK_POINTER(cmd, return -1);
+	CHECK_POINTER(uri, return -1);
+	CHECK_POINTER(sess_name, return -1);
+
+	RtspServerRecordInfo rec_info;
+	memset(&rec_info, 0, sizeof(RtspServerRecordInfo));
+
+	char buffer[256] = {0};
+    strncpy(buffer, uri, sizeof(buffer));
+
+    char *path = strtok(buffer, "?");
+	CHECK_POINTER(path, return -1);
+
+    char *query = strtok(NULL, "/");
+	CHECK_POINTER(query, return -1);
+
+	char *saveptr = NULL;
+	char *param = strtok_r(query, "&", &saveptr);
+	while (param != NULL) {
+		char *delim = strpbrk(param, "=");
+		if (delim != NULL) {
+			*delim = '\0';
+			char *key = param;
+			char *value = delim + 1;
+
+			if (strcmp(key, "auth") == 0) {
+				char username[32] = {0};
+				char password[64] = {0};
+				sscanf(value, "%64[^:]:%s", username, password);
+				LOG_DEBUG("username:%s, password:%s", username, password);
+
+				// TODO 用户校验
+			} else if (strcmp(key, "record_file") == 0) {
+				rec_info.mode = RTSP_SERVER_GET_RECORD_BY_FILE;
+				strncpy(rec_info.filename, value, sizeof(rec_info.filename));
+			} else if (strcmp(key, "start_time") == 0) {
+				rec_info.mode = RTSP_SERVER_GET_RECORD_BY_TIME;
+				sscanf(value, "%04d%02d%02dT%02d%02d%02d", 
+					&rec_info.start_time.year, &rec_info.start_time.month, &rec_info.start_time.day, 
+					&rec_info.start_time.hour, &rec_info.start_time.min, &rec_info.start_time.sec);
+			} else if (strcmp(key, "end_time") == 0) {
+				sscanf(value, "%04d%02d%02dT%02d%02d%02d", 
+					&rec_info.end_time.year, &rec_info.end_time.month, &rec_info.end_time.day, 
+					&rec_info.end_time.hour, &rec_info.end_time.min, &rec_info.end_time.sec);
+			}
+		}
+		param = strtok_r(NULL, "&", &saveptr);
+	}
+	
+    char *type = strtok(path, "/");
+    char *id = strtok(NULL, "/");
+	CHECK_POINTER(type, return -1);
+	CHECK_POINTER(id, return -1);
+
+	if(strcmp(type, "recording") == 0) {
+		strncpy(sess_name, type, size);
+
+		rec_info.chn = atoi(id) / 100;
+		if (kRtspServerMsg.record_oper_cb != NULL && (strcmp(cmd, "play") == 0 || strcmp(cmd, "teardown") == 0)) {
+			if (strcmp(cmd, "teardown") == 0) {
+				rec_info.mode = RTSP_SERVER_GET_RECORD_STOP;
+			}
+
+			((RtspServerOperationRecording)kRtspServerMsg.record_oper_cb)(&rec_info);
+		}
+	} else {
+		snprintf(sess_name, size, "%s/%s", type, id);
+	}
+
+	return 0;
+}
 
 static void* RtspServerProc(void* arg) {
 	kRtspServerMsg.env->scheduler()->loop();
@@ -75,7 +149,7 @@ static void RtspServerLogInit(const char* log_path) {
     LogInit(file_path, 512*1024, 3, 3);
 }
 
-int RtspServerInit(const char* log_path) {
+int RtspServerInit(const char* log_path, const char* config_path) {
 	RtspServerLogInit(log_path);
 
 	Logger::setLogLevel(Logger::LogWarning);
@@ -102,14 +176,21 @@ int RtspServerUnInit() {
 	return 0;
 }
 
-void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, int size) {
+void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, unsigned int size) {
+	CHECK_POINTER(info, return);
+	CHECK_LE(size, 0, return);
+
 	for (int i = 0; i < size; i++) {
 		RtspServerStreamingRegisterInfo _info;
 		memcpy(&_info, &info[i], sizeof(RtspServerStreamingRegisterInfo));
 
 		char sess_name[16] = {0};
-		snprintf(sess_name, sizeof(sess_name), "streaming/%03d", _info.chn*100+_info.stream_type+1);
-	
+		if(_info.chn == -1) {
+			snprintf(sess_name, sizeof(sess_name), "recording");
+		} else {
+			snprintf(sess_name, sizeof(sess_name), "streaming/%03d", _info.chn*100+_info.stream_type+1);
+		}
+
 		MediaSession* session = MediaSession::createNew(sess_name);
 		if (_info.video_info.use) {
 			MediaSource* source = VideoSource::createNew(kRtspServerMsg.env, _info.chn, _info.stream_type, _info.video_info.fps);
@@ -133,24 +214,14 @@ void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, int size
 		}
 	
 		kRtspServerMsg.server->addMeidaSession(session);
-		LOG_INFO("%s", kRtspServerMsg.server->getUrl(session).c_str());
+		LOG_INFO("%s%s?auth=<username>:<password>&<param>", kRtspServerMsg.server->getUrl(session).c_str(), _info.chn == -1 ? "/<chn*100+1>" : "");
 		kRtspServerMsg.reg_list.push_back(_info);
 	}
 }
 
-void RtspServerRecordingRegister(int chn) {
-	char sess_name[16] = {0};
-	snprintf(sess_name, sizeof(sess_name), "recording/%03d", chn*100+1);
-
-    MediaSession* session = MediaSession::createNew(sess_name);
-    MediaSource* mediaSource = VideoSource::createNew(kRtspServerMsg.env, chn, 1, 30);
-    RtpSink* rtpSink = H264RtpSink::createNew(kRtspServerMsg.env, mediaSource);
-
-	session->addRtpSink(MediaSession::TrackId0, rtpSink);
-	kRtspServerMsg.server->addMeidaSession(session);
-}
-
 int RtspServerPushStream(RtspServerPushStreamInfo* info) {
+	CHECK_POINTER(info, return -1);
+
 	int flag = false;
 	for(RtspServerStreamingRegisterInfo reg_item : kRtspServerMsg.reg_list) {
 		if (reg_item.chn == info->chn && reg_item.stream_type == info->stream_type) {
@@ -165,4 +236,9 @@ int RtspServerPushStream(RtspServerPushStreamInfo* info) {
 		LOG_ERR("unknown chn:%d, type:%d", info->chn, info->stream_type);
 		return -1;
 	}
+}
+
+void RtspServerOperationRegister(void* cb) {
+	CHECK_POINTER(cb, return);
+	kRtspServerMsg.record_oper_cb = cb;
 }

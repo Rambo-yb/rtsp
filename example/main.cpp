@@ -14,6 +14,7 @@ typedef struct {
 }__Frame;
 
 typedef struct {
+	int record_flag;
 	unsigned char* media_data;
 	std::list<__Frame> media_list;
 }Mng;
@@ -181,11 +182,20 @@ static unsigned char* FindFrame(const unsigned char* buff, int len, int* size) {
 
 static void* RecordPush(void* arg) {
     while(1) {
+		if (!kMng.record_flag) {
+			usleep(10*1000);
+			continue;
+		}
+
         for(__Frame frame : kMng.media_list) {
+			if (!kMng.record_flag) {
+				break;
+			}
+
 			long cur_time = GetTime();
 			RtspServerPushStreamInfo info = {0};
-			info.chn = 0;
-			info.stream_type = RTSP_SERVER_STREAMING_SUB;
+			info.chn = -1;
+			info.stream_type = RTSP_SERVER_STREAMING_MAIN;
 			info.buff = frame.data;
 			info.size = frame.size;
             RtspServerPushStream(&info);
@@ -193,6 +203,8 @@ static void* RecordPush(void* arg) {
             	usleep(1*1000);
 			}
         }
+
+		kMng.record_flag = false;
     }
 }
 
@@ -241,14 +253,28 @@ static int RecordInit() {
     return 0;
 }
 
+int RecordOperation(RtspServerRecordInfo* info) {
+	return 0;
+	printf("mode:%d flag:%d\n", info->mode, kMng.record_flag);
+	if (info->mode == RTSP_SERVER_GET_RECORD_STOP && kMng.record_flag) {
+		kMng.record_flag = false;
+	} else {
+		kMng.record_flag = true;
+	}
+	return 0;
+}
+
 int main(int argv, char** argc) {
-	RtspServerInit("./");
+	RtspServerInit(NULL, NULL);
 
 	RtspServerStreamingRegisterInfo info[2] = {
+		// 实时流
 		{.chn = 0, .stream_type = RTSP_SERVER_STREAMING_MAIN, .video_info = {.use = 1, .video_type = RTSP_SERVER_VIDEO_H264, .fps = 30}},
-		{.chn = 0, .stream_type = RTSP_SERVER_STREAMING_SUB, .video_info = {.use = 1, .video_type = RTSP_SERVER_VIDEO_H264, .fps = 30}},
+		// 录像流
+		{.chn = -1, .stream_type = RTSP_SERVER_STREAMING_MAIN, .video_info = {.use = 1, .video_type = RTSP_SERVER_VIDEO_H264, .fps = 25}},
 	};
 	RtspServerStreamingRegister(info, 2);
+	RtspServerOperationRegister((void*)RecordOperation);
 
 	StreamInit();
 	RecordInit();
