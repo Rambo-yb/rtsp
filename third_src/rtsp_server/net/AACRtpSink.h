@@ -8,9 +8,9 @@
 class AACRtpSink : public RtpSink
 {
 public:
-    static AACRtpSink* createNew(UsageEnvironment* env, MediaSource* mediaSource);;
+    static AACRtpSink* createNew(UsageEnvironment* env, MediaSource* mediaSource, int sample_rate, int channels);;
     
-    AACRtpSink(UsageEnvironment* env, MediaSource* mediaSource, int payloadType);
+    AACRtpSink(UsageEnvironment* env, MediaSource* mediaSource, int sample_rate, int channels);
     virtual ~AACRtpSink();
 
     virtual std::string getMediaDescription(uint16_t port);

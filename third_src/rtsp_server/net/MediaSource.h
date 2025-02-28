@@ -23,6 +23,8 @@ public:
     uint8_t* mBuffer;
     uint8_t* mFrame;
     int mFrameSize;
+	// 源码修改：记录帧PTS
+	uint64_t pts;
 };
 
 class MediaSource

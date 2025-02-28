@@ -75,7 +75,7 @@ void H264RtpSink::handleFrame(AVFrame* frame)
             *   |F|NRI|  Type   |
             *   +---------------+
             * */
-            rtpHeader->payload[0] = (naluType & 0x60) | 28; //(naluType & 0x60)表示nalu的重要性，28表示为分片
+            rtpHeader->payload[0] = (naluType & 0xe0) | 28; //(naluType & 0x60)表示nalu的重要性，28表示为分片
             
             /*
             *      FU Header
@@ -102,7 +102,7 @@ void H264RtpSink::handleFrame(AVFrame* frame)
         /* 发送剩余的数据 */
         if (remainPktSize > 0)
         {
-            rtpHeader->payload[0] = (naluType & 0x60) | 28;
+            rtpHeader->payload[0] = (naluType & 0xe0) | 28;
             rtpHeader->payload[1] = naluType & 0x1F;
             rtpHeader->payload[1] |= 0x40; //end
 
@@ -114,5 +114,9 @@ void H264RtpSink::handleFrame(AVFrame* frame)
         }
     }
     
-    mTimestamp += mClockRate/mFps;
+	if(frame->pts == 0) {
+		mTimestamp += mClockRate/mFps;
+	} else {
+		mTimestamp = frame->pts;
+	}
 }

@@ -44,6 +44,16 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/example/rv1126/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/example/rv1126/lib)
 endif()
 
+if (MEDIA_TYPE STREQUAL "ffmpeg")
+add_definitions(-DFFMPEG_ENABLE)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/x264/include)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/x264/lib)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/ffmpeg/include)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_install/ffmpeg/lib)
+endif()
+
 add_library(rtsp SHARED ${SRC})
 
 add_executable(rtsp_test ${MAIN_SRC})
@@ -56,7 +66,9 @@ target_link_libraries(rtsp_test easymedia RKAP_3A RKAP_ANR RKAP_Common rknn_runt
 target_link_libraries(rtsp_test rockchip_mpp liveMedia groupsock BasicUsageEnvironment UsageEnvironment asound v4l2 v4lconvert rga sqlite3 od_share OpenVX GAL)
 endif()
 
-target_link_libraries(rtsp_test ssl crypto)
+if (MEDIA_TYPE STREQUAL "ffmpeg")
+target_link_libraries(rtsp_test avdevice avfilter avcodec avformat avutil postproc swresample swscale x264)
+endif()
 
 install(TARGETS rtsp_test DESTINATION bin)
 install(TARGETS rtsp DESTINATION lib)

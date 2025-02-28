@@ -9,6 +9,7 @@
 
 #include "video_source.h"
 #include "log.h"
+#include "check_common.h"
 
 #include "base/Logging.h"
 #include "base/New.h"
@@ -17,11 +18,12 @@
 #define VIDEO_SOURCE_STREAM_TYPE_MAX (3)
 
 #define VIDEO_SOURCE_SIZE_MAX (512*1024)
-#define VIDEO_SOURCE_QUEUE_MAX (2)
+#define SOURCE_QUEUE_MAX (2)
 
 typedef struct {
 	unsigned char video_src[VIDEO_SOURCE_SIZE_MAX];
 	unsigned int size;
+	uint64_t pts;
 }VideoSourceInfo;
 
 typedef struct {
@@ -31,7 +33,11 @@ typedef struct {
 }VideoSourceMng;
 static VideoSourceMng kVideoSourceMng = {.mutex = PTHREAD_MUTEX_INITIALIZER};
 
-int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size) {
+int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size, uint64_t pts) {
+	CHECK_POINTER(pkt, return -1);
+	CHECK_LE(size, 0, return -1);
+	CHECK_GT(size, VIDEO_SOURCE_SIZE_MAX, return -1);
+
 	pthread_mutex_lock(&kVideoSourceMng.mutex);
 	std::queue<VideoSourceInfo>* src_info_queue = nullptr;
 	if(chn == -1) {
@@ -40,22 +46,23 @@ int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size) {
 		src_info_queue = &kVideoSourceMng.real_video_src[chn][type];
 	}
 
-	if(src_info_queue->size() >= VIDEO_SOURCE_QUEUE_MAX) {
+	if(src_info_queue->size() >= SOURCE_QUEUE_MAX) {
 		VideoSourceInfo info = src_info_queue->front();
 		src_info_queue->pop();
-		LOG_WRN("chn[%d] type[%d] video queue greater than queue max [%d], remove old video src !!!", chn, type, VIDEO_SOURCE_QUEUE_MAX);
+		LOG_WRN("chn[%d] type[%d] video queue greater than queue max [%d], remove old video src !!!", chn, type, SOURCE_QUEUE_MAX);
 	}
 
 	VideoSourceInfo new_src;
 	memcpy(new_src.video_src, pkt, size);
 	new_src.size = size;
+	new_src.pts = pts;
 	src_info_queue->push(new_src);
 
 	pthread_mutex_unlock(&kVideoSourceMng.mutex);
 	return 0;
 }
 
-int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size) {
+int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size, uint64_t* pts) {
 	pthread_mutex_lock(&kVideoSourceMng.mutex);
 	std::queue<VideoSourceInfo>* src_info_queue = nullptr;
 	if(chn == -1) {
@@ -75,6 +82,7 @@ int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size) {
 		return -1;
 	}
 	memcpy(pkt, info.video_src, info.size);
+	*pts = info.pts;
 	src_info_queue->pop();
 
 	pthread_mutex_unlock(&kVideoSourceMng.mutex);
@@ -108,7 +116,7 @@ void VideoSource::readFrame() {
 
 	AVFrame* frame = mAVFrameInputQueue.front();
 
-	frame->mFrameSize = VideoSourcePop(channel, stream_type, frame->mBuffer, FRAME_MAX_SIZE);
+	frame->mFrameSize = VideoSourcePop(channel, stream_type, frame->mBuffer, FRAME_MAX_SIZE, &frame->pts);
 	if(frame->mFrameSize < 0)
 		return;
 

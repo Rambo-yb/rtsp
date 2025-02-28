@@ -6,16 +6,16 @@
 #include "base/Logging.h"
 #include "base/New.h"
 
-AACRtpSink* AACRtpSink::createNew(UsageEnvironment* env, MediaSource* mediaSource)
+AACRtpSink* AACRtpSink::createNew(UsageEnvironment* env, MediaSource* mediaSource, int sample_rate, int channels)
 {
     //return new AACRtpSink(env, mediaSource, RTP_PAYLOAD_TYPE_AAC);
-    return New<AACRtpSink>::allocate(env, mediaSource, RTP_PAYLOAD_TYPE_AAC);
+    return New<AACRtpSink>::allocate(env, mediaSource, sample_rate, channels);
 }
 
-AACRtpSink::AACRtpSink(UsageEnvironment* env, MediaSource* mediaSource, int payloadType) :
-    RtpSink(env, mediaSource, payloadType),
-    mSampleRate(44100),
-    mChannels(2),
+AACRtpSink::AACRtpSink(UsageEnvironment* env, MediaSource* mediaSource, int sample_rate, int channels) :
+    RtpSink(env, mediaSource, RTP_PAYLOAD_TYPE_AAC),
+    mSampleRate(sample_rate),
+    mChannels(channels),
     mFps(mediaSource->getFps())
 {
     mMarker = 1;
@@ -91,7 +91,12 @@ void AACRtpSink::handleFrame(AVFrame* frame)
 
     mSeq++;
 
+	// 源码修改：添加pts传入
     /* (1000 / mFps) 表示一帧多少毫秒 */
-    mTimestamp += mSampleRate * (1000 / mFps) / 1000;
+	if (frame->pts == 0) {
+		mTimestamp += mSampleRate * (1000 / mFps) / 1000;
+	} else {
+		mTimestamp = frame->pts;
+	}
 }
 

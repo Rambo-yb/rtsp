@@ -1,14 +1,11 @@
 #ifndef __VIDEO_SOURCE_H__
 #define __VIDEO_SOURCE_H__
 
-int VideoSourceInit();
+#include <stdint.h>
 
-int VideoSourceUninit();
+int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size, uint64_t pts);
 
-int VideoSourcePush(int chn, int type, unsigned char* pkt, unsigned int size);
-
-int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size);
-
+int VideoSourcePop(int chn, int type, unsigned char* pkt, unsigned int size, uint64_t* pts);
 
 #include "net/UsageEnvironment.h"
 #include "net/MediaSource.h"

@@ -20,6 +20,7 @@ else
 fi
 
 CHIP_TYPE=$1
+MEDIA_TYPE=$3
 INSTALL_DIR=$CUR_DIR/_install
 
 build_openssl()
@@ -63,6 +64,47 @@ build_live555()
 	[ -d $SOURCE_DIR ] && rm -r $SOURCE_DIR
 }
 
+build_x264()
+{
+    SOURCE_DIR=libx264-git
+    SOURCE_INSTALL_DIR=$INSTALL_DIR/x264
+
+    cd $CUR_DIR/third_lib
+    [ -d $SOURCE_INSTALL_DIR ] && [ "$1" != "rebuild" ] && exit
+    [ -d $SOURCE_DIR ] && rm -r $SOURCE_DIR
+    [ -d $SOURCE_INSTALL_DIR ] && rm -r $SOURCE_INSTALL_DIR
+
+    tar -xvf $SOURCE_DIR.tar.xz
+    cd $SOURCE_DIR
+    ./configure --prefix=$SOURCE_INSTALL_DIR --cross-prefix=$HOST- --host=$HOST --disable-asm --disable-opencl --enable-static 
+    make && make install
+    
+    cd $CUR_DIR/third_lib
+    [ -d $SOURCE_DIR ] && rm -r $SOURCE_DIR
+}
+
+build_ffmpeg()
+{
+    SOURCE_DIR=ffmpeg-7.0
+    SOURCE_INSTALL_DIR=$INSTALL_DIR/ffmpeg
+
+    cd $CUR_DIR/third_lib
+    [ -d $SOURCE_INSTALL_DIR ] && [ "$1" != "rebuild" ] && exit
+    [ -d $SOURCE_DIR ] && rm -r $SOURCE_DIR
+    [ -d $SOURCE_INSTALL_DIR ] && rm -r $SOURCE_INSTALL_DIR
+
+    tar -xvzf $SOURCE_DIR.tar.gz
+    cd $SOURCE_DIR
+    export PKG_CONFIG_PATH="$INSTALL_DIR/x264/lib/pkgconfig:$PKG_CONFIG_PATH"
+    ./configure --cross-prefix=$HOST- --enable-cross-compile --target-os=linux --cc=$HOST-gcc --arch=arm --prefix=$SOURCE_INSTALL_DIR \
+        --enable-static --enable-gpl --enable-nonfree --enable-swscale --enable-ffmpeg --disable-armv5te --disable-yasm --enable-libx264 --enable-protocol=rtmp \
+        --extra-cflags=-I$INSTALL_DIR/x264/include --extra-ldflags=-L$INSTALL_DIR/x264/lib --extra-libs="-lpthread" --pkg-config="pkg-config --static"
+    make -j4 && make install
+    
+    cd $CUR_DIR/third_lib
+    [ -d $SOURCE_DIR ] && rm -r $SOURCE_DIR
+}
+
 build_main()
 {
 	cd $CUR_DIR
@@ -75,7 +117,7 @@ build_main()
 
 	mkdir build
 	cd $CUR_DIR/build
-	cmake .. -DCMAKE_C_COMPILER=${HOST}-gcc -DCMAKE_CXX_COMPILER=${HOST}-g++ -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/rtsp -DCHIP_TYPE=$CHIP_TYPE
+	cmake .. -DCMAKE_C_COMPILER=${HOST}-gcc -DCMAKE_CXX_COMPILER=${HOST}-g++ -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/rtsp -DCHIP_TYPE=$CHIP_TYPE -DMEDIA_TYPE=$MEDIA_TYPE
 	make && make install
 }
 
@@ -99,6 +141,8 @@ build_pack()
 
 [ "$2" == "openssl" ] && build_openssl rebuild && exit
 [ "$2" == "live555" ] && build_live555 rebuild && exit
+[ "$2" == "x264" ] && build_x264 rebuild && exit
+[ "$2" == "ffmpeg" ] && build_ffmpeg rebuild && exit
 [ "$2" == "main" ] && build_main && exit
 [ "$2" == "pack" ] && build_pack $1 && exit
 

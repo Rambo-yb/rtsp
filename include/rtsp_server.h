@@ -1,6 +1,8 @@
 #ifndef __RTSP_SERVER_H__
 #define __RTSP_SERVER_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,7 +28,13 @@ typedef enum {
 }RtspServerStreamingType;
 
 typedef enum {
+	RTSP_SERVER_FRAME_VIDEO,		// 视频帧
+	RTSP_SERVER_FRAME_AUDIO,		// 音频帧
+}RtspServerFrameType;
+
+typedef enum {
 	RTSP_SERVER_VIDEO_H264,
+	RTSP_SERVER_VIDEO_H265,
 }RtspServerVideoType;
 
 typedef struct {
@@ -37,6 +45,7 @@ typedef struct {
 
 typedef enum {
 	RTSP_SERVER_AUDIO_AAC,
+	RTSP_SERVER_AUDIO_G711A,
 }RtspServerAudioType;
 
 typedef struct {
@@ -50,7 +59,7 @@ typedef struct {
 	int chn;							// 音视频通道，【-1：录像回放通道】
 	unsigned int stream_type;			// 码流类型，RtspServerStreamingType
 	RtspServerVideoInfo video_info;		// 视频信息
-	RtspServerAudioInfo audio_info;		// 音频信息，暂不支持
+	RtspServerAudioInfo audio_info;		// 音频信息
 }RtspServerStreamingRegisterInfo;
 
 /**
@@ -62,8 +71,9 @@ void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, unsigned
 
 typedef struct {
 	int chn;					// 音视频通道，【-1：录像回放通道】
+	int frame_type;				// 帧类型，RtspServerFrameType
 	unsigned int stream_type;	// 码流类型，RtspServerStreamingType
-	unsigned int pts;
+	uint64_t pts;				// 【0：内部计算】【 != 0：使用该值】
 	unsigned int size;
 	unsigned char* buff;
 }RtspServerPushStreamInfo;
@@ -96,13 +106,23 @@ typedef struct {
 
 	// RTSP_SERVER_GET_RECORD_BY_FILE
 	char filename[128];				// 文件名
+	int offset_time;				// 录像偏移时间，单位：秒
 
 	// RTSP_SERVER_GET_RECORD_BY_TIME
 	int chn;					// 通道
 	RtspServerTime start_time;	// 开始时间
 	RtspServerTime end_time;	// 结束时间
 }RtspServerRecordInfo;
-typedef int (*RtspServerOperationRecording)(RtspServerRecordInfo* );
+
+typedef struct {
+	unsigned char reserve;
+}RtspServerForceIdr;
+
+typedef enum {
+	RTSP_SERVER_OPERATION_RECORDING = 0x10000,		// 录像处理 RtspServerRecordInfo
+	RTSP_SERVER_OPERATION_FORCE_IDR,				// 强制I帧 RtspServerForceIdr
+}RtspServerOperationType;
+typedef int (*RtspServerOperationCb)(int, void* );	// type, st
 
 /**
  * @brief RTSP服务器回调注册函数

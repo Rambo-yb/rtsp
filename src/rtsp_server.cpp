@@ -8,6 +8,8 @@
 #include "check_common.h"
 #include "rtsp_server.h"
 #include "video_source.h"
+#include "audio_source.h"
+#include "h265_rtp_sink.h"
 
 #include "base/Logging.h"
 #include "net/UsageEnvironment.h"
@@ -69,6 +71,8 @@ extern int RtspServerUrlParse(const char* cmd, const char* uri, char* sess_name,
 			} else if (strcmp(key, "record_file") == 0) {
 				rec_info.mode = RTSP_SERVER_GET_RECORD_BY_FILE;
 				strncpy(rec_info.filename, value, sizeof(rec_info.filename));
+			} else if (strcmp(key, "offset_time") == 0) {
+				rec_info.offset_time = atoi(value);
 			} else if (strcmp(key, "start_time") == 0) {
 				rec_info.mode = RTSP_SERVER_GET_RECORD_BY_TIME;
 				sscanf(value, "%04d%02d%02dT%02d%02d%02d", 
@@ -97,10 +101,14 @@ extern int RtspServerUrlParse(const char* cmd, const char* uri, char* sess_name,
 				rec_info.mode = RTSP_SERVER_GET_RECORD_STOP;
 			}
 
-			((RtspServerOperationRecording)kRtspServerMsg.record_oper_cb)(&rec_info);
+			((RtspServerOperationCb)kRtspServerMsg.record_oper_cb)(RTSP_SERVER_OPERATION_RECORDING, &rec_info);
 		}
 	} else {
 		snprintf(sess_name, size, "%s/%s", type, id);
+		if (kRtspServerMsg.record_oper_cb != NULL && strcmp(cmd, "play") == 0) {
+			RtspServerForceIdr idr;
+			((RtspServerOperationCb)kRtspServerMsg.record_oper_cb)(RTSP_SERVER_OPERATION_FORCE_IDR, &idr);
+		}
 	}
 
 	return 0;
@@ -197,17 +205,18 @@ void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, unsigned
 			RtpSink* sink = NULL;
 			if (_info.video_info.video_type == RTSP_SERVER_VIDEO_H264) {
 				sink = H264RtpSink::createNew(kRtspServerMsg.env, source);
-			}
+			} else {
+				sink = H265RtpSink::createNew(kRtspServerMsg.env, source);
+			} 
 	
 			session->addRtpSink(MediaSession::TrackId0, sink);
 		}
 	
 		if (_info.audio_info.use) {
-			// MediaSource* source = VideoSource::createNew(kRtspServerMsg.env, _info.chn, _info.stream_type, _info.video_info.fps);
-			MediaSource* source = NULL;
+			MediaSource* source = AudioSource::createNew(kRtspServerMsg.env, _info.chn, _info.stream_type, _info.video_info.fps);
 			RtpSink* sink = NULL;
-			if (_info.video_info.video_type == RTSP_SERVER_VIDEO_H264) {
-				sink = AACRtpSink::createNew(kRtspServerMsg.env, source);
+			if (_info.audio_info.audio_type == RTSP_SERVER_AUDIO_AAC) {
+				sink = AACRtpSink::createNew(kRtspServerMsg.env, source, _info.audio_info.sample_rate, _info.audio_info.channels);
 			}
 	
 			session->addRtpSink(MediaSession::TrackId1, sink);
@@ -231,7 +240,11 @@ int RtspServerPushStream(RtspServerPushStreamInfo* info) {
 	}
 
 	if (flag) {
-		return VideoSourcePush(info->chn, info->stream_type, info->buff, info->size);
+		if (info->frame_type == RTSP_SERVER_FRAME_AUDIO){
+			return AudioSourcePush(info->chn, info->stream_type, info->buff, info->size, info->pts);
+		} else {
+			return VideoSourcePush(info->chn, info->stream_type, info->buff, info->size, info->pts);
+		}
 	} else {
 		LOG_ERR("unknown chn:%d, type:%d", info->chn, info->stream_type);
 		return -1;
