@@ -268,6 +268,10 @@ extern "C" {
 #include <libavcodec/bsf.h>
 #include <libavutil/intreadwrite.h>
 
+#ifdef __cplusplus
+}
+#endif
+
 constexpr int ADTS_HEADER_LEN = 7;
  
 const int sampling_frequencies[] = {
@@ -360,9 +364,11 @@ static void* FfmpegProc(void* arg) {
 
     // 找到视频流和音频流的索引
     int video_stream_index = -1;
-    int audio_stream_index = -1;
+    int aac_audio_stream_index = -1;
+    int g711a_audio_stream_index = -1;
     AVCodecParameters *video_codecpar = NULL;
-    AVCodecParameters *audio_codecpar = NULL;
+    AVCodecParameters *aac_audio_codecpar = NULL;
+    AVCodecParameters *g711a_audio_codecpar = NULL;
 
     for (int i = 0; i < fmt_ctx->nb_streams; i++) {
         AVCodecParameters *codecpar = fmt_ctx->streams[i]->codecpar;
@@ -375,9 +381,17 @@ static void* FfmpegProc(void* arg) {
 
         // 查找 AAC 音频流
         if (codecpar->codec_type == AVMEDIA_TYPE_AUDIO && codecpar->codec_id == AV_CODEC_ID_AAC) {
-            audio_stream_index = i;
-            audio_codecpar = codecpar;
+            aac_audio_stream_index = i;
+            aac_audio_codecpar = codecpar;
         }
+
+        if (codecpar->codec_type == AVMEDIA_TYPE_AUDIO && codecpar->codec_id == AV_CODEC_ID_PCM_ALAW) {
+            g711a_audio_stream_index = i;
+            g711a_audio_codecpar = codecpar;
+			printf("G711A rate:%d chn:%d\n", codecpar->sample_rate, codecpar->ch_layout.nb_channels);
+
+        }
+		printf("codec id :%x\n", codecpar->codec_id);
     }
 
     if (video_stream_index == -1) {
@@ -385,8 +399,8 @@ static void* FfmpegProc(void* arg) {
         return NULL;
     }
 
-    if (audio_stream_index == -1) {
-        printf("AAC audio stream not found\n");
+    if (aac_audio_stream_index == -1 && g711a_audio_stream_index == -1) {
+        printf("AAC/G711A audio stream not found\n");
         return NULL;
     }
 
@@ -402,11 +416,14 @@ static void* FfmpegProc(void* arg) {
     }
 
     // 打开音频解码器
-    const AVCodec *audio_codec = avcodec_find_decoder(audio_codecpar->codec_id);
-    if (!audio_codec || avcodec_open2(audio_codec_ctx, audio_codec, NULL) < 0) {
-        printf("Failed to open audio codec\n");
-        return NULL;
-    }
+    const AVCodec *audio_codec = NULL;
+	if (aac_audio_stream_index != -1) {
+		audio_codec = avcodec_find_decoder(aac_audio_codecpar->codec_id);
+		if (!audio_codec || avcodec_open2(audio_codec_ctx, audio_codec, NULL) < 0) {
+			printf("Failed to open audio codec\n");
+			return NULL;
+		}
+	}
 
     AVPacket packet;
     av_init_packet(&packet);
@@ -457,12 +474,11 @@ static void* FfmpegProc(void* arg) {
 					usleep(1*1000);
 				}
 
-			} else if (packet.stream_index == audio_stream_index) {
-				long cur_time = GetTime();
+			} else if (packet.stream_index == aac_audio_stream_index) {
 				// 提取 AAC 音频数据
 				char pkt[1024] = {0};
-				adts_header(pkt, packet.size, fmt_ctx->streams[audio_stream_index]->codecpar->profile, 
-					fmt_ctx->streams[audio_stream_index]->codecpar->sample_rate,fmt_ctx->streams[audio_stream_index]->codecpar->ch_layout.nb_channels);
+				adts_header(pkt, packet.size, fmt_ctx->streams[aac_audio_stream_index]->codecpar->profile, 
+					fmt_ctx->streams[aac_audio_stream_index]->codecpar->sample_rate,fmt_ctx->streams[aac_audio_stream_index]->codecpar->ch_layout.nb_channels);
 				memcpy(pkt+7, packet.data, packet.size);
 
 				RtspServerPushStreamInfo info = {0};
@@ -475,9 +491,23 @@ static void* FfmpegProc(void* arg) {
 				RtspServerPushStream(&info);
 
 				av_packet_unref(&packet);  // 清理包数据
+			} else if (packet.stream_index == g711a_audio_stream_index) {
+				long cur_time = GetTime();
+				RtspServerPushStreamInfo info = {0};
+				info.chn = -1;
+				info.frame_type = RTSP_SERVER_FRAME_AUDIO;
+				info.stream_type = RTSP_SERVER_STREAMING_MAIN;
+				info.buff = packet.data;
+				info.size = packet.size;
+				info.pts = packet.pts;
+				RtspServerPushStream(&info);
+
+				av_packet_unref(&packet);  // 清理包数据
+				while(cur_time + 67 > GetTime()) {
+					usleep(1*1000);
+				}
 			}
 		}
-
 
 		kMng.record_flag = false;
 	}
@@ -487,10 +517,6 @@ static void* FfmpegProc(void* arg) {
     avcodec_free_context(&audio_codec_ctx);
     avformat_close_input(&fmt_ctx);
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 

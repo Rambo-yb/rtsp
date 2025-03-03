@@ -74,7 +74,7 @@ typedef struct {
 	int frame_type;				// 帧类型，RtspServerFrameType
 	unsigned int stream_type;	// 码流类型，RtspServerStreamingType
 	uint64_t pts;				// 【0：内部计算】【 != 0：使用该值】
-	unsigned int size;
+	unsigned int size;			// 音频单次传输大小需要小于1400字节
 	unsigned char* buff;
 }RtspServerPushStreamInfo;
 

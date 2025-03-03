@@ -17,7 +17,7 @@
 #define VIDEO_SOURCE_CHN_MAX (4)
 #define VIDEO_SOURCE_STREAM_TYPE_MAX (3)
 
-#define AUDIO_SOURCE_SIZE_MAX (1024)
+#define AUDIO_SOURCE_SIZE_MAX (2*1024)
 #define SOURCE_QUEUE_MAX (2)
 
 typedef struct {

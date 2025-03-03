@@ -150,6 +150,10 @@ public:
     int read(int fd);
     int write(int fd);
 
+	char* print() {
+		return mBuffer;
+	}
+
 private:
     char* begin()
     { return mBuffer; }

@@ -79,7 +79,7 @@ void RtspConnection::handleReadBytes()
     ret = parseRequest();
     if(ret != true)
     {
-        LOG_WARNING("failed to parse request\n");
+        LOG_WARNING("failed to parse request\n%s\n", mInputBuffer.print());
         goto err;
     }
 

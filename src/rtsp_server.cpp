@@ -10,6 +10,7 @@
 #include "video_source.h"
 #include "audio_source.h"
 #include "h265_rtp_sink.h"
+#include "g711a_rtp_sink.h"
 
 #include "base/Logging.h"
 #include "net/UsageEnvironment.h"
@@ -217,6 +218,8 @@ void RtspServerStreamingRegister(RtspServerStreamingRegisterInfo* info, unsigned
 			RtpSink* sink = NULL;
 			if (_info.audio_info.audio_type == RTSP_SERVER_AUDIO_AAC) {
 				sink = AACRtpSink::createNew(kRtspServerMsg.env, source, _info.audio_info.sample_rate, _info.audio_info.channels);
+			} else if (_info.audio_info.audio_type == RTSP_SERVER_AUDIO_G711A) {
+				sink = G711aRtpSink::createNew(kRtspServerMsg.env, source, _info.audio_info.sample_rate, _info.audio_info.channels);
 			}
 	
 			session->addRtpSink(MediaSession::TrackId1, sink);
